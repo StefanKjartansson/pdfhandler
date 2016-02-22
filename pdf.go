@@ -1,4 +1,4 @@
-package main
+package pdfhandler
 
 import (
 	"bufio"
@@ -15,46 +15,9 @@ import (
 	"sync"
 )
 
-func xfdf(m map[string]string) []byte {
-	buffer := bytes.NewBufferString("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
-	buffer.WriteString("<xfdf xmlns=\"http://ns.adobe.com/xfdf/\" xml:space=\"preserve\">")
-	buffer.WriteString("<fields>")
-	for k, v := range m {
-		buffer.WriteString(fmt.Sprintf("<field name=\"%s\"><value>%s</value></field>\n", k, v))
-	}
-	buffer.WriteString("</fields>")
-	buffer.WriteString("</xfdf>")
-	return buffer.Bytes()
-}
-
 type PDF struct {
 	FileName string            `json:"filename"`
 	Fields   map[string]string `json:"fields"`
-}
-
-func readFields(rootPath, fp string) (*PDF, error) {
-	path := filepath.Join(rootPath, fp)
-	cmd := exec.Command("pdftk", path, "dump_data_fields_utf8")
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	var t bytes.Buffer
-	cmd.Stderr = &t
-	err := cmd.Run()
-	if err != nil {
-		return nil, errors.New(t.String())
-	}
-	p := PDF{
-		FileName: fp,
-		Fields:   make(map[string]string),
-	}
-	scanner := bufio.NewScanner(&out)
-	for scanner.Scan() {
-		t := scanner.Text()
-		if strings.HasPrefix(t, "FieldName:") {
-			p.Fields[strings.TrimSpace(t[11:])] = ""
-		}
-	}
-	return &p, nil
 }
 
 func (p PDF) render(rootPath string) ([]byte, error) {
@@ -67,7 +30,7 @@ func (p PDF) render(rootPath string) ([]byte, error) {
 		return nil, err
 	}
 	defer os.Remove(tmpfile.Name()) // clean up
-	if _, err := tmpfile.Write(xfdf(p.Fields)); err != nil {
+	if _, err := tmpfile.Write(mapToXFDF(p.Fields)); err != nil {
 		return nil, err
 	}
 	if err := tmpfile.Close(); err != nil {
@@ -174,37 +137,36 @@ func (p PDFHandler) post(w http.ResponseWriter, req *http.Request) {
 	r := bufio.NewReader(req.Body)
 	dec := json.NewDecoder(r)
 	ch, _ := r.Peek(1)
-
-	// Single PDF
-	if string(ch) == "{" {
+	switch string(ch) {
+	case "{":
 		var x PDF
 		err := dec.Decode(&x)
 		if err != nil {
-			http.Error(w, err.Error(), 400)
+			http.Error(w, err.Error(), http.StatusNotAcceptable)
 			return
 		}
 		out, err := x.render(p.FilePath)
 		if err != nil {
-			http.Error(w, err.Error(), 500)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		w.Write(out)
-
-		// List of PDFS
-	} else if string(ch) == "[" {
+		break
+	case "[":
 		var pdfs []PDF
 		err := dec.Decode(&pdfs)
 		if err != nil {
-			http.Error(w, err.Error(), 400)
+			http.Error(w, err.Error(), http.StatusNotAcceptable)
 			return
 		}
 		err = p.multi(pdfs, w)
 		if err != nil {
-			http.Error(w, err.Error(), 500)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-	} else {
-		http.Error(w, "Invalid input", 400)
+		break
+	default:
+		http.Error(w, "Invalid input", http.StatusNotAcceptable)
 		return
 	}
 	w.Header().Set("Content-Disposition", "attachment; filename=file.pdf")
