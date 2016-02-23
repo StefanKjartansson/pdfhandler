@@ -115,3 +115,38 @@ func TestPostMultiZip(t *testing.T) {
 	ct := resp.Header.Get("Content-Type")
 	assert.Equal(t, ct, "application/zip")
 }
+
+func TestInvalidContentType(t *testing.T) {
+	req, err := http.NewRequest("POST", ts.URL, bytes.NewBufferString(""))
+	req.Header.Set("Content-Type", "something else")
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, resp.StatusCode, http.StatusBadRequest)
+}
+
+func TestInvalidAccept(t *testing.T) {
+	req, err := http.NewRequest("POST", ts.URL, bytes.NewBufferString(""))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "something else")
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, resp.StatusCode, http.StatusBadRequest)
+}
+
+func TestInvalidBody(t *testing.T) {
+	req, err := http.NewRequest("POST", ts.URL, bytes.NewBufferString(""))
+	req.Header.Set("Accept", "application/zip")
+	req.Header.Set("Content-Type", "application/json")
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, resp.StatusCode, http.StatusBadRequest)
+}

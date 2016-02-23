@@ -16,6 +16,13 @@ import (
 	"sync"
 )
 
+var (
+	acceptedContentTypes = []string{
+		"application/zip",
+		"application/pdf",
+	}
+)
+
 type PDF struct {
 	FileName string            `json:"filename"`
 	Fields   map[string]string `json:"fields"`
@@ -118,13 +125,9 @@ func (ph PDFHandler) multi(mimetype string, pdfs []PDF, w http.ResponseWriter) e
 				return err
 			}
 		}
-		err := zw.Close()
-		if err != nil {
-			return err
-		}
+		return zw.Close()
 		break
 	}
-
 	return nil
 }
 
@@ -172,12 +175,15 @@ func (p PDFHandler) get(w http.ResponseWriter, req *http.Request) {
 func (p PDFHandler) post(w http.ResponseWriter, req *http.Request) {
 	ct := req.Header.Get("Content-Type")
 	if ct != "application/json" {
-		http.Error(w, "Invalid Content-Type", http.StatusNotAcceptable)
+		http.Error(w, "Invalid Content-Type", http.StatusBadRequest)
 		return
 	}
 
 	ac := req.Header.Get("Accept")
-	// validate ac
+	if !stringInSlice(ac, acceptedContentTypes) {
+		http.Error(w, "Invalid Accept header", http.StatusBadRequest)
+		return
+	}
 
 	r := bufio.NewReader(req.Body)
 	dec := json.NewDecoder(r)
@@ -187,7 +193,7 @@ func (p PDFHandler) post(w http.ResponseWriter, req *http.Request) {
 		var x PDF
 		err := dec.Decode(&x)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusNotAcceptable)
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 		out, err := x.render(p.FilePath)
@@ -201,7 +207,7 @@ func (p PDFHandler) post(w http.ResponseWriter, req *http.Request) {
 		var pdfs []PDF
 		err := dec.Decode(&pdfs)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusNotAcceptable)
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 		err = p.multi(ac, pdfs, w)
@@ -211,7 +217,7 @@ func (p PDFHandler) post(w http.ResponseWriter, req *http.Request) {
 		}
 		break
 	default:
-		http.Error(w, "Invalid input", http.StatusNotAcceptable)
+		http.Error(w, "Invalid input", http.StatusBadRequest)
 		return
 	}
 	w.Header().Set("Content-Disposition", "attachment; filename=file.pdf")
