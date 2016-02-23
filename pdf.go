@@ -14,6 +14,8 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+
+	"github.com/satori/go.uuid"
 )
 
 var (
@@ -193,9 +195,23 @@ func (p PDFHandler) post(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	filename := req.Header.Get("X-Filename")
+	if filename == "" {
+		filename = uuid.NewV4().String()
+	}
+	if strings.HasSuffix(ac, "zip") {
+		filename += ".zip"
+	} else if strings.HasSuffix(ac, "pdf") {
+		filename += ".pdf"
+	}
+
 	r := bufio.NewReader(req.Body)
 	dec := json.NewDecoder(r)
 	ch, _ := r.Peek(1)
+
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filename))
+	w.Header().Set("Content-Type", ac)
+
 	switch string(ch) {
 	case "{":
 		var x PDF
@@ -228,8 +244,6 @@ func (p PDFHandler) post(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, "Invalid input", http.StatusBadRequest)
 		return
 	}
-	w.Header().Set("Content-Disposition", "attachment; filename=file.pdf")
-	w.Header().Set("Content-Type", ac)
 }
 
 func (p PDFHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
