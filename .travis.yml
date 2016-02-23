@@ -13,6 +13,7 @@ before_install:
 install:
  - go get -u github.com/golang/lint/golint
  - go get github.com/stretchr/testify
+ - go get github.com/satori/go.uuid
 
 script:
  - golint
