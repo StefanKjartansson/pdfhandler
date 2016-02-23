@@ -30,7 +30,7 @@ var (
 )
 
 func TestMain(m *testing.M) {
-	pdfHandler := PDFHandler{"./pdf-test"}
+	pdfHandler, _ := New("./pdf-test")
 	ts = httptest.NewServer(pdfHandler)
 	defer ts.Close()
 	os.Exit(m.Run())

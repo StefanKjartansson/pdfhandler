@@ -57,7 +57,15 @@ func (p PDF) render(rootPath string) ([]byte, error) {
 }
 
 type PDFHandler struct {
-	FilePath string
+	filePath string
+}
+
+func New(path string) (*PDFHandler, error) {
+	_, err := os.Stat(path)
+	if err != nil {
+		return nil, err
+	}
+	return &PDFHandler{path}, nil
 }
 
 func (ph PDFHandler) multi(mimetype string, pdfs []PDF, w http.ResponseWriter) error {
@@ -81,7 +89,7 @@ func (ph PDFHandler) multi(mimetype string, pdfs []PDF, w http.ResponseWriter) e
 			go func(idx int, p PDF) {
 				defer wg.Done()
 				tmpfn := filepath.Join(dir, fmt.Sprintf("%d.pdf", idx))
-				b, err := p.render(ph.FilePath)
+				b, err := p.render(ph.filePath)
 				if err != nil {
 					return
 				}
@@ -132,7 +140,7 @@ func (ph PDFHandler) multi(mimetype string, pdfs []PDF, w http.ResponseWriter) e
 }
 
 func (p PDFHandler) get(w http.ResponseWriter, req *http.Request) {
-	files, err := ioutil.ReadDir(p.FilePath)
+	files, err := ioutil.ReadDir(p.filePath)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -147,7 +155,7 @@ func (p PDFHandler) get(w http.ResponseWriter, req *http.Request) {
 			}
 			wg.Add(1)
 			go func(fp string) {
-				p, err := readFields(p.FilePath, fp)
+				p, err := readFields(p.filePath, fp)
 				if err == nil {
 					ch <- *p
 				}
@@ -196,7 +204,7 @@ func (p PDFHandler) post(w http.ResponseWriter, req *http.Request) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		out, err := x.render(p.FilePath)
+		out, err := x.render(p.filePath)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
