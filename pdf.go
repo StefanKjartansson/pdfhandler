@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -60,26 +59,38 @@ func (ph PDFHandler) multi(mimetype string, pdfs []PDF, w http.ResponseWriter) e
 		return err
 	}
 	defer os.RemoveAll(dir)
-	var wg sync.WaitGroup
-	for idx, p := range pdfs {
-		wg.Add(1)
-		go func(idx int, p PDF) {
-			defer wg.Done()
-			tmpfn := filepath.Join(dir, fmt.Sprintf("%d.pdf", idx))
-			b, err := p.render(ph.FilePath)
-			if err != nil {
-				return
-			}
-			ioutil.WriteFile(tmpfn, b, 0777)
-		}(idx, p)
+
+	type job struct {
+		Pdf  PDF
+		File string
+		Body []byte
 	}
-	wg.Wait()
+	ch := make(chan job)
+
+	go func() {
+		var wg sync.WaitGroup
+		for idx, p := range pdfs {
+			wg.Add(1)
+			go func(idx int, p PDF) {
+				defer wg.Done()
+				tmpfn := filepath.Join(dir, fmt.Sprintf("%d.pdf", idx))
+				b, err := p.render(ph.FilePath)
+				if err != nil {
+					return
+				}
+				ioutil.WriteFile(tmpfn, b, 0777)
+				ch <- job{p, tmpfn, b}
+			}(idx, p)
+		}
+		wg.Wait()
+		close(ch)
+	}()
 
 	switch mimetype {
 	case "application/pdf":
 		cmd := exec.Command("pdftk")
-		for idx := range pdfs {
-			cmd.Args = append(cmd.Args, filepath.Join(dir, fmt.Sprintf("%d.pdf", idx)))
+		for j := range ch {
+			cmd.Args = append(cmd.Args, j.File)
 		}
 		cmd.Args = append(cmd.Args, "cat")
 		cmd.Args = append(cmd.Args, "output")
@@ -97,16 +108,12 @@ func (ph PDFHandler) multi(mimetype string, pdfs []PDF, w http.ResponseWriter) e
 		break
 	case "application/zip":
 		zw := zip.NewWriter(w)
-		for idx := range pdfs {
-			f, err := zw.Create(fmt.Sprintf("%d.pdf", idx))
+		for j := range ch {
+			f, err := zw.Create(j.Pdf.FileName)
 			if err != nil {
 				return err
 			}
-			xx, err := os.Open(filepath.Join(dir, fmt.Sprintf("%d.pdf", idx)))
-			if err != nil {
-				return err
-			}
-			_, err = io.Copy(f, xx)
+			_, err = f.Write(j.Body)
 			if err != nil {
 				return err
 			}
