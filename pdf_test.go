@@ -150,3 +150,13 @@ func TestInvalidBody(t *testing.T) {
 	}
 	assert.Equal(t, resp.StatusCode, http.StatusBadRequest)
 }
+
+func TestInvalidMethod(t *testing.T) {
+	req, err := http.NewRequest("DELETE", ts.URL, bytes.NewBufferString(""))
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, resp.StatusCode, http.StatusMethodNotAllowed)
+}
