@@ -52,7 +52,7 @@ func TestGet(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer resp.Body.Close()
-	assert.Equal(t, resp.StatusCode, 200)
+	assert.Equal(t, resp.StatusCode, http.StatusOK)
 }
 
 func TestPostSingle(t *testing.T) {
@@ -69,7 +69,7 @@ func TestPostSingle(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer resp.Body.Close()
-	assert.Equal(t, resp.StatusCode, 200)
+	assert.Equal(t, resp.StatusCode, http.StatusOK)
 }
 
 func TestPostMulti(t *testing.T) {
@@ -86,7 +86,7 @@ func TestPostMulti(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK {
 		var buf bytes.Buffer
 		buf.ReadFrom(resp.Body)
 		t.Fatalf("Got status %d and body %q", resp.StatusCode, buf.String())
@@ -109,7 +109,7 @@ func TestPostMultiZip(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK {
 		t.Fatal("Not working")
 	}
 	ct := resp.Header.Get("Content-Type")

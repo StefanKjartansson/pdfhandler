@@ -134,7 +134,7 @@ func (ph PDFHandler) multi(mimetype string, pdfs []PDF, w http.ResponseWriter) e
 func (p PDFHandler) get(w http.ResponseWriter, req *http.Request) {
 	files, err := ioutil.ReadDir(p.FilePath)
 	if err != nil {
-		http.Error(w, err.Error(), 500)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	ch := make(chan PDF)
@@ -166,7 +166,7 @@ func (p PDFHandler) get(w http.ResponseWriter, req *http.Request) {
 	enc := json.NewEncoder(w)
 	err = enc.Encode(pdfs)
 	if err != nil {
-		http.Error(w, err.Error(), 500)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
