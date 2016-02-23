@@ -1,11 +1,13 @@
 package pdfhandler
 
 import (
+	"archive/zip"
 	"bufio"
 	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -52,7 +54,7 @@ type PDFHandler struct {
 	FilePath string
 }
 
-func (ph PDFHandler) multi(pdfs []PDF, w http.ResponseWriter) error {
+func (ph PDFHandler) multi(mimetype string, pdfs []PDF, w http.ResponseWriter) error {
 	dir, err := ioutil.TempDir("", "workpath")
 	if err != nil {
 		return err
@@ -73,22 +75,49 @@ func (ph PDFHandler) multi(pdfs []PDF, w http.ResponseWriter) error {
 	}
 	wg.Wait()
 
-	cmd := exec.Command("pdftk")
-	for idx := range pdfs {
-		cmd.Args = append(cmd.Args, filepath.Join(dir, fmt.Sprintf("%d.pdf", idx)))
+	switch mimetype {
+	case "application/pdf":
+		cmd := exec.Command("pdftk")
+		for idx := range pdfs {
+			cmd.Args = append(cmd.Args, filepath.Join(dir, fmt.Sprintf("%d.pdf", idx)))
+		}
+		cmd.Args = append(cmd.Args, "cat")
+		cmd.Args = append(cmd.Args, "output")
+		cmd.Args = append(cmd.Args, "-")
+		var out bytes.Buffer
+		cmd.Stdout = &out
+		var t bytes.Buffer
+		cmd.Stderr = &t
+		err = cmd.Run()
+		if err != nil {
+			return errors.New(t.String())
+		}
+		w.Write(out.Bytes())
+		return nil
+		break
+	case "application/zip":
+		zw := zip.NewWriter(w)
+		for idx := range pdfs {
+			f, err := zw.Create(fmt.Sprintf("%d.pdf", idx))
+			if err != nil {
+				return err
+			}
+			xx, err := os.Open(filepath.Join(dir, fmt.Sprintf("%d.pdf", idx)))
+			if err != nil {
+				return err
+			}
+			_, err = io.Copy(f, xx)
+			if err != nil {
+				return err
+			}
+		}
+		err := zw.Close()
+		if err != nil {
+			return err
+		}
+		break
 	}
-	cmd.Args = append(cmd.Args, "cat")
-	cmd.Args = append(cmd.Args, "output")
-	cmd.Args = append(cmd.Args, "-")
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	var t bytes.Buffer
-	cmd.Stderr = &t
-	err = cmd.Run()
-	if err != nil {
-		return errors.New(t.String())
-	}
-	w.Write(out.Bytes())
+
 	return nil
 }
 
@@ -134,6 +163,15 @@ func (p PDFHandler) get(w http.ResponseWriter, req *http.Request) {
 }
 
 func (p PDFHandler) post(w http.ResponseWriter, req *http.Request) {
+	ct := req.Header.Get("Content-Type")
+	if ct != "application/json" {
+		http.Error(w, "Invalid Content-Type", http.StatusNotAcceptable)
+		return
+	}
+
+	ac := req.Header.Get("Accept")
+	// validate ac
+
 	r := bufio.NewReader(req.Body)
 	dec := json.NewDecoder(r)
 	ch, _ := r.Peek(1)
@@ -159,7 +197,7 @@ func (p PDFHandler) post(w http.ResponseWriter, req *http.Request) {
 			http.Error(w, err.Error(), http.StatusNotAcceptable)
 			return
 		}
-		err = p.multi(pdfs, w)
+		err = p.multi(ac, pdfs, w)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -170,7 +208,7 @@ func (p PDFHandler) post(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Disposition", "attachment; filename=file.pdf")
-	w.Header().Set("Content-Type", "application/pdf")
+	w.Header().Set("Content-Type", ac)
 }
 
 func (p PDFHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
