@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/satori/go.uuid"
 )
@@ -121,7 +122,12 @@ func (ph PDFHandler) multi(mimetype string, pdfs []PDF, w http.ResponseWriter) e
 	case "application/zip":
 		zw := zip.NewWriter(w)
 		for j := range ch {
-			f, err := zw.Create(j.Pdf.FileName)
+			header := &zip.FileHeader{
+				Name:   j.Pdf.FileName,
+				Method: zip.Deflate,
+			}
+			header.SetModTime(time.Now())
+			f, err := zw.CreateHeader(header)
 			if err != nil {
 				return err
 			}
