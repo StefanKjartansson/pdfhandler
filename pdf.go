@@ -23,39 +23,32 @@ var (
 		"application/zip",
 		"application/pdf",
 	}
+	logger StdLogger
 )
 
-type PDF struct {
-	FileName string            `json:"filename"`
-	Fields   map[string]string `json:"fields"`
+func init() {
+	logger = &noOpLogger{}
 }
 
-func (p PDF) render(rootPath string) ([]byte, error) {
-	path := filepath.Join(rootPath, p.FileName)
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		return nil, err
-	}
-	tmpfile, err := ioutil.TempFile("", "example")
-	if err != nil {
-		return nil, err
-	}
-	defer os.Remove(tmpfile.Name()) // clean up
-	if _, err := tmpfile.Write(mapToXFDF(p.Fields)); err != nil {
-		return nil, err
-	}
-	if err := tmpfile.Close(); err != nil {
-		return nil, err
-	}
-	cmd := exec.Command("pdftk", path, "fill_form", tmpfile.Name(), "output", "-")
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	var t bytes.Buffer
-	cmd.Stderr = &t
-	err = cmd.Run()
-	if err != nil {
-		return nil, errors.New(t.String())
-	}
-	return out.Bytes(), nil
+type StdLogger interface {
+	Debugf(string, ...interface{})
+	Errorf(string, ...interface{})
+}
+
+type noOpLogger struct{}
+
+func (l *noOpLogger) Debugf(format string, args ...interface{}) {
+}
+func (l *noOpLogger) Errorf(format string, args ...interface{}) {
+}
+
+func Error(w http.ResponseWriter, error string, code int) {
+	logger.Errorf("http error: %q", error)
+	http.Error(w, error, code)
+}
+
+func SetLogger(l StdLogger) {
+	logger = l
 }
 
 type PDFHandler struct {
@@ -91,6 +84,7 @@ func (ph PDFHandler) multi(mimetype string, pdfs []PDF, w http.ResponseWriter) e
 			go func(idx int, p PDF) {
 				defer wg.Done()
 				tmpfn := filepath.Join(dir, fmt.Sprintf("%d.pdf", idx))
+				logger.Debugf("Rendering %s/%s to %s", ph.filePath, p.FileName, tmpfn)
 				b, err := p.render(ph.filePath)
 				if err != nil {
 					return
@@ -112,6 +106,7 @@ func (ph PDFHandler) multi(mimetype string, pdfs []PDF, w http.ResponseWriter) e
 		cmd.Args = append(cmd.Args, "cat")
 		cmd.Args = append(cmd.Args, "output")
 		cmd.Args = append(cmd.Args, "-")
+		logger.Debugf("Executing pdftk: %q", strings.Join(cmd.Args, " "))
 		var out bytes.Buffer
 		cmd.Stdout = &out
 		var t bytes.Buffer
@@ -144,7 +139,7 @@ func (ph PDFHandler) multi(mimetype string, pdfs []PDF, w http.ResponseWriter) e
 func (p PDFHandler) get(w http.ResponseWriter, req *http.Request) {
 	files, err := ioutil.ReadDir(p.filePath)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	ch := make(chan PDF)
@@ -176,7 +171,7 @@ func (p PDFHandler) get(w http.ResponseWriter, req *http.Request) {
 	enc := json.NewEncoder(w)
 	err = enc.Encode(pdfs)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -185,13 +180,13 @@ func (p PDFHandler) get(w http.ResponseWriter, req *http.Request) {
 func (p PDFHandler) post(w http.ResponseWriter, req *http.Request) {
 	ct := req.Header.Get("Content-Type")
 	if ct != "application/json" {
-		http.Error(w, "Invalid Content-Type", http.StatusBadRequest)
+		Error(w, "Invalid Content-Type", http.StatusBadRequest)
 		return
 	}
 
 	ac := req.Header.Get("Accept")
 	if !stringInSlice(ac, acceptedContentTypes) {
-		http.Error(w, "Invalid Accept header", http.StatusBadRequest)
+		Error(w, "Invalid Accept header", http.StatusBadRequest)
 		return
 	}
 
@@ -217,12 +212,12 @@ func (p PDFHandler) post(w http.ResponseWriter, req *http.Request) {
 		var x PDF
 		err := dec.Decode(&x)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 		out, err := x.render(p.filePath)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		w.Write(out)
@@ -231,17 +226,17 @@ func (p PDFHandler) post(w http.ResponseWriter, req *http.Request) {
 		var pdfs []PDF
 		err := dec.Decode(&pdfs)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 		err = p.multi(ac, pdfs, w)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		break
 	default:
-		http.Error(w, "Invalid input", http.StatusBadRequest)
+		Error(w, "Invalid input", http.StatusBadRequest)
 		return
 	}
 }
@@ -253,7 +248,7 @@ func (p PDFHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	case "POST":
 		p.post(w, req)
 	default:
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 }

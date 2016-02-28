@@ -30,6 +30,17 @@ var (
 	}
 )
 
+type testLogger struct {
+	t *testing.T
+}
+
+func (l *testLogger) Debugf(format string, args ...interface{}) {
+	l.t.Logf(format, args)
+}
+func (l *testLogger) Errorf(format string, args ...interface{}) {
+	l.t.Logf(format, args)
+}
+
 func TestMain(m *testing.M) {
 	pdfHandler, _ := New("./pdf-test")
 	ts = httptest.NewServer(pdfHandler)
@@ -57,6 +68,7 @@ func TestGet(t *testing.T) {
 }
 
 func TestPostSingle(t *testing.T) {
+	SetLogger(&testLogger{t})
 	b, err := json.Marshal(single)
 	if err != nil {
 		t.Fatal(err)
@@ -74,6 +86,7 @@ func TestPostSingle(t *testing.T) {
 }
 
 func TestPostMulti(t *testing.T) {
+	SetLogger(&testLogger{t})
 	b, err := json.Marshal(multi)
 	if err != nil {
 		t.Fatal(err)
@@ -97,6 +110,7 @@ func TestPostMulti(t *testing.T) {
 }
 
 func TestPostMultiFilename(t *testing.T) {
+	SetLogger(&testLogger{t})
 	b, err := json.Marshal(multi)
 	if err != nil {
 		t.Fatal(err)
@@ -124,6 +138,7 @@ func TestPostMultiFilename(t *testing.T) {
 }
 
 func TestPostMultiZip(t *testing.T) {
+	SetLogger(&testLogger{t})
 	b, err := json.Marshal(multi)
 	if err != nil {
 		t.Fatal(err)
@@ -145,6 +160,7 @@ func TestPostMultiZip(t *testing.T) {
 }
 
 func TestInvalidContentType(t *testing.T) {
+	SetLogger(&testLogger{t})
 	req, err := http.NewRequest("POST", ts.URL, bytes.NewBufferString(""))
 	req.Header.Set("Content-Type", "something else")
 	client := &http.Client{}
@@ -156,6 +172,7 @@ func TestInvalidContentType(t *testing.T) {
 }
 
 func TestInvalidAccept(t *testing.T) {
+	SetLogger(&testLogger{t})
 	req, err := http.NewRequest("POST", ts.URL, bytes.NewBufferString(""))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "something else")
@@ -168,6 +185,7 @@ func TestInvalidAccept(t *testing.T) {
 }
 
 func TestInvalidBody(t *testing.T) {
+	SetLogger(&testLogger{t})
 	req, err := http.NewRequest("POST", ts.URL, bytes.NewBufferString(""))
 	req.Header.Set("Accept", "application/zip")
 	req.Header.Set("Content-Type", "application/json")
@@ -180,6 +198,7 @@ func TestInvalidBody(t *testing.T) {
 }
 
 func TestInvalidMethod(t *testing.T) {
+	SetLogger(&testLogger{t})
 	req, err := http.NewRequest("DELETE", ts.URL, bytes.NewBufferString(""))
 	client := &http.Client{}
 	resp, err := client.Do(req)

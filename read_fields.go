@@ -28,6 +28,7 @@ func scanFields(filename string, r io.Reader) *PDF {
 func readFields(rootPath, fp string) (*PDF, error) {
 	path := filepath.Join(rootPath, fp)
 	cmd := exec.Command("pdftk", path, "dump_data_fields_utf8")
+	logger.Debugf("Executing pdftk %q", strings.Join(cmd.Args, " "))
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	var t bytes.Buffer
