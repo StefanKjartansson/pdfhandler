@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -101,8 +102,13 @@ func (ph PDFHandler) multi(mimetype string, pdfs []PDF, w http.ResponseWriter) e
 	switch mimetype {
 	case "application/pdf":
 		cmd := exec.Command("pdftk")
+		files := []string{}
 		for j := range ch {
-			cmd.Args = append(cmd.Args, j.File)
+			files = append(files, j.File)
+		}
+		sort.Strings(files)
+		for _, f := range files {
+			cmd.Args = append(cmd.Args, f)
 		}
 		cmd.Args = append(cmd.Args, "cat")
 		cmd.Args = append(cmd.Args, "output")
