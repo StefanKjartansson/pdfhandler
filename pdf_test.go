@@ -15,17 +15,27 @@ import (
 var ts *httptest.Server
 var (
 	single = PDF{
-		"OoPdfFormExample.pdf",
-		map[string]string{"Family Name Text Box": "Barsson"},
+		FileName: "OoPdfFormExample.pdf",
+		Fields:   map[string]string{"Family Name Text Box": "Barsson"},
 	}
 	multi = []PDF{
 		{
-			"OoPdfFormExample.pdf",
-			map[string]string{"Family Name Text Box": "Barsson"},
+			FileName: "OoPdfFormExample.pdf",
+			Fields:   map[string]string{"Family Name Text Box": "Barsson"},
 		},
 		{
-			"OoPdfFormExample.pdf",
-			map[string]string{"Family Name Text Box": "Barsson"},
+			FileName: "OoPdfFormExample.pdf",
+			Fields:   map[string]string{"Family Name Text Box": "Barsson"},
+		},
+	}
+	multiWithContent = []PDF{
+		{
+			FileName: "OoPdfFormExample.pdf",
+			Fields:   map[string]string{"Family Name Text Box": "Barsson"},
+		},
+		{
+			FileName: "FakeName.pdf",
+			Content:  testB64,
 		},
 	}
 )
@@ -144,6 +154,9 @@ func TestPostMultiZip(t *testing.T) {
 		t.Fatal(err)
 	}
 	req, err := http.NewRequest("POST", ts.URL, bytes.NewBuffer(b))
+	if err != nil {
+		t.Fatal(err)
+	}
 	req.Header.Set("Accept", "application/zip")
 	req.Header.Set("Content-Type", "application/json")
 	client := &http.Client{}
@@ -157,6 +170,32 @@ func TestPostMultiZip(t *testing.T) {
 	}
 	ct := resp.Header.Get("Content-Type")
 	assert.Equal(t, ct, "application/zip")
+}
+
+func TestPostMultiContentZip(t *testing.T) {
+	SetLogger(&testLogger{t})
+	b, err := json.Marshal(multiWithContent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req, err := http.NewRequest("POST", ts.URL, bytes.NewBuffer(b))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Accept", "application/zip")
+	req.Header.Set("Content-Type", "application/json")
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatal("Not working")
+	}
+	ct := resp.Header.Get("Content-Type")
+	assert.Equal(t, ct, "application/zip")
+	t.Logf("Response: %q", resp)
 }
 
 func TestInvalidContentType(t *testing.T) {
