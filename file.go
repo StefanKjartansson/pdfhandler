@@ -2,6 +2,7 @@ package pdfhandler
 
 import (
 	"bytes"
+	"encoding/base64"
 	"errors"
 	"io/ioutil"
 	"os"
@@ -13,9 +14,15 @@ import (
 type PDF struct {
 	FileName string            `json:"filename"`
 	Fields   map[string]string `json:"fields"`
+	Content  string            `json:"content"`
 }
 
 func (p PDF) render(rootPath string) ([]byte, error) {
+
+	if p.Content != "" {
+		return p.decodeContent()
+	}
+
 	if p.FileName == "" {
 		return nil, errors.New("Invalid filename")
 	}
@@ -45,4 +52,8 @@ func (p PDF) render(rootPath string) ([]byte, error) {
 		return nil, errors.New(t.String())
 	}
 	return out.Bytes(), nil
+}
+
+func (p PDF) decodeContent() ([]byte, error) {
+	return base64.StdEncoding.DecodeString(p.Content)
 }
