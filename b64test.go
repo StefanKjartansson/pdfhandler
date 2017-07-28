@@ -1,4 +1,5 @@
 // +build !test
+
 package pdfhandler
 
 const testB64 = `JVBERi0xLjQKJcOkw7zDtsOfCjIgMCBvYmoKPDwvTGVuZ3RoIDMgMCBSL0ZpbHRl
