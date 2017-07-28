@@ -124,7 +124,6 @@ func (ph PDFHandler) multi(mimetype string, pdfs []PDF, w http.ResponseWriter) e
 		}
 		w.Write(out.Bytes())
 		return nil
-		break
 	case "application/zip":
 		zw := zip.NewWriter(w)
 		for j := range ch {
@@ -143,7 +142,6 @@ func (ph PDFHandler) multi(mimetype string, pdfs []PDF, w http.ResponseWriter) e
 			}
 		}
 		return zw.Close()
-		break
 	}
 	return nil
 }
