@@ -195,7 +195,7 @@ func TestPostMultiContentZip(t *testing.T) {
 	}
 	ct := resp.Header.Get("Content-Type")
 	assert.Equal(t, ct, "application/zip")
-	t.Logf("Response: %q", resp)
+	t.Logf("Response: %v", resp)
 }
 
 func TestInvalidContentType(t *testing.T) {
