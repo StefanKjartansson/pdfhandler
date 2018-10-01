@@ -202,7 +202,12 @@ func (p PDFHandler) post(w http.ResponseWriter, req *http.Request) {
 
 	filename := req.Header.Get("X-Filename")
 	if filename == "" {
-		filename = uuid.NewV4().String()
+		uid, err := uuid.NewV4()
+		if err != nil {
+			filename = "unknown"
+		} else {
+			filename = uid.String()
+		}
 	}
 	if strings.HasSuffix(ac, "zip") {
 		filename += ".zip"
