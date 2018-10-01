@@ -45,10 +45,11 @@ type testLogger struct {
 }
 
 func (l *testLogger) Debugf(format string, args ...interface{}) {
-	l.t.Logf(format, args)
+	l.t.Logf(format, args...)
 }
+
 func (l *testLogger) Errorf(format string, args ...interface{}) {
-	l.t.Logf(format, args)
+	l.t.Logf(format, args...)
 }
 
 func TestMain(m *testing.M) {
